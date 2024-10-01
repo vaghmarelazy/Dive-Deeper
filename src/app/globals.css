@@ -25,3 +25,32 @@ body {
     text-wrap: balance;
   }
 }
+
+.font-logo {
+  font-family: var(--font-logo), sans-serif;
+}
+.geistSans{
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+.geistMono{
+  font-family: var(--font-geist-mono), sans-serif;
+}
+
+.poppins{
+  font-family: var(--font-poppins), sans-serif;
+}
+
+::-webkit-scrollbar{
+  color: #ffffffdd;
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #212121dd;
+  border-radius: 10px;
+}

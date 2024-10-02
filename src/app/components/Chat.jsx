@@ -39,7 +39,7 @@ function Chat({ videoId }) {
 
     try {
       // Call the backend API to get the AI response
-      const response = await fetch("/api/GroqAI", {
+      const response = await fetch("/api/groqChat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -51,9 +51,10 @@ function Chat({ videoId }) {
       console.log(response);
 
       if (response.ok) {
+        const formattedResponse = formatAIResponse(data.response);
         setConversation((prev) => [
           ...prev,
-          { sender: "ai", message: data.response },
+          { sender: "ai", message: formattedResponse },
         ]);
       } else {
         console.error("Error:", data.error);
@@ -72,6 +73,23 @@ function Chat({ videoId }) {
       setProcessing(false);
       scrollToBottom(); // Scroll to the bottom after getting the response
     }
+  };
+  const formatAIResponse = (text) => {
+    let counter = 1;
+
+    return text
+      .replace(/\n/g, "<br/>") // Replace newlines with <br> for line breaks
+      .replace(/\* (.*?)\n/g, () => `<br/><strong>${counter++}. </strong>`) // Replace '*' with increasing numbers
+      .replace(/-?\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Convert **text** to bold
+      .replace(/(.*?):/g, "<strong>$1:</strong>") // Make headings bold (text followed by a colon)
+      .replace(
+        /(Benefits|How it Works|Tips for Use|Types of)/gi,
+        "<h2 class='text-xl font-bold'>$1</h2>" // Larger, bold headers for main sections
+      )
+      .replace(
+        /(Overview|Conclusion)/gi,
+        "<h3 class='text-lg font-semibold'>$1</h3>" // Slightly smaller headers for sub-sections
+      );
   };
 
   useEffect(() => {
@@ -146,7 +164,7 @@ function Chat({ videoId }) {
             <h1 className="text-center text-5xl font-bold">
               Dive <span>Deeper</span> AI
             </h1>
-            <div className="w-3/4 p-2 mx-auto h-[80vh] resize-none rounded-xl bg-stone-900 focus:outline-none">
+            <div className="w-3/4 p-2 overflow-y-auto mx-auto h-[80vh] resize-none rounded-xl bg-stone-900 focus:outline-none">
               {/* Render the conversation */}
               {conversation.map((msg, index) => (
                 <div

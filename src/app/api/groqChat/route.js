@@ -5,11 +5,11 @@ const groq = new Groq({
     apiKey: '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'
 });
 
-export async function main() {
-  const chatCompletion = await getGroqChatCompletion();
-  // Print the completion returned by the LLM.
-  console.log(chatCompletion.choices[0]?.message?.content || "");
-}
+// export async function main() {
+//   const chatCompletion = await getGroqChatCompletion();
+//   // Print the completion returned by the LLM.
+//   console.log(chatCompletion.choices[0]?.message?.content || "");
+// }
 
 export async function POST(req) {
     try {

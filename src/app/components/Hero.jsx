@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Chat from "./Chat";
 
 function Hero() {
@@ -8,6 +8,8 @@ function Hero() {
   const [error, setError] = useState("");
   const [textareaHeight, setTextareaHeight] = useState("min-h-10");
   const [loading, setLoading] = useState(false);
+
+  const chatRef = useRef(null);
 
   const extractVideoId = (url) => {
     try {
@@ -41,7 +43,6 @@ function Hero() {
       return;
     }
 
-    
     setVideoId(id);
     setLoading(false);
     setError(""); // Clear any previous errors
@@ -53,13 +54,21 @@ function Hero() {
       initializeVideoPlayer();
     }
   };
+
+  // Scroll to chat when videoId changes
+  useEffect(() => {
+    if (videoId && chatRef.current) { 
+      chatRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [videoId]);
+
   return (
     <div>
       <logo className="h-auto flex flex-col items-center justify-center">
-        <h1 className="text-6xl font-bold font-poppins mx-auto mt-10 w-fit">
+        <h1 className="text-6xl font-bold font-poppins mx-auto mt-10 w-fit ">
           Let&apos;s <span className="text-red-600">Dive</span> In
         </h1>
-        <p className="font-thin font-poppins mx-auto w-fit">
+        <p className="font-thin font-poppins mx-auto w-fit ">
           Lets dive Deeper what Exites you with AI
         </p>
         <input
@@ -72,7 +81,7 @@ function Hero() {
             if (e.key === "Enter") {
               initializeVideoPlayer();
             }
-          }} // Add onKeyPress event handler
+          }} 
         />
         <button
           className="bg-red-600 text-white px-4 py-2 rounded-xl mt-4"
@@ -90,7 +99,7 @@ function Hero() {
           ></iframe>
         )}
       </logo>
-      {videoId && <Chat videoId={videoId}/>}
+      {videoId && <div ref={chatRef}><Chat videoId={videoId}/></div>}
     </div>
   );
 }

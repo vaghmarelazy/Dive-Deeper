@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import ArrowOut from "../assets/arrow_outward.svg";
 import Stop from "../assets/stop.svg";
+import Close from "../assets/close.svg";
 import axios from "axios";
 
-function Chat({ VideoId }) {
+function Chat({ videoId }) {
   const [inputMessage, setInputMessage] = useState("");
   const [processing, setProcessing] = useState(false);
   const [videoData, setVideoData] = useState(null);
   const [conversation, setConversation] = useState([]); // To hold the full conversation
+  const [confirmation, setConfirmation] = useState(false);
   const chatEndRef = useRef(null); // For auto-scrolling
   const api = "AIzaSyBphJE_76cQvqaG0r75MhERv-9Ka33etwU";
 
@@ -46,7 +48,7 @@ function Chat({ VideoId }) {
       });
 
       const data = await response.json();
-      console.log(response)
+      console.log(response);
 
       if (response.ok) {
         setConversation((prev) => [
@@ -77,7 +79,7 @@ function Chat({ VideoId }) {
       console.log(process.env.NEXT_GROQ_API_KEY);
       try {
         const response = await axios.get(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${VideoId}&key=${api}`
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${api}`
         );
         console.log(response.data.items);
 
@@ -93,57 +95,104 @@ function Chat({ VideoId }) {
       }
     };
     fetchData();
-  }, [VideoId]);
+  }, [videoId]);
 
   return (
-    <div>
-      <div className="w-full h-screen flex flex-col mx-auto gap-2">
-        <h1 className="text-center text-5xl font-bold">
-          Dive <span>Deeper</span> AI
-        </h1>
-        <div className="w-3/4 p-2 mx-auto h-[80vh] resize-none rounded-xl  bg-stone-900 focus:outline-none">
-          {/* Render the conversation */}
-          {conversation.map((msg, index) => (
-            <div
-              key={index}
-              className={`mb-4 flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start w-full"
-              }`}
-            >
-              <div
-                className={`px-4 py-2 rounded-2xl max-w-[100%] font-light ${
-                  msg.sender === "user" ? "bg-zinc-950 text-white" : ""
-                }`}
-                dangerouslySetInnerHTML={{ __html: msg.message }}
-              />
-            </div>
-          ))}
-          <div ref={chatEndRef} />
-        </div>
-        <div className="w-3/4 mx-auto bg-stone-800 flex flex-row rounded-xl justify-between items-end">
-          <textarea
-            type="text"
-            className="bg-transparent p-2 h-14 w-[90%] resize-none focus:outline-none break-words whitespace-pre-line bg-stone-800 items-end"
-            placeholder="Ask Dive Deeper AI..."
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                handleSend();
-              }
-            }}
-          ></textarea>
-          <button
-            className="bg-white m-1 w-12 h-12 rounded-full"
-            onClick={handleSend}
+    <>
+      {videoId && (
+        <div>
+          <div
+            className={`w-full h-screen absolute bg-black/50 flex items-center z-10 text-white justify-center ${
+              confirmation ? "hidden" : "block"
+            }`}
           >
-            <span className="flex items-center justify-center p-2">
-              {processing ? <Stop /> : <ArrowOut />}
-            </span>
-          </button>
+            <button
+              className="absolute m-auto top-[10%] bg-zinc-300 rounded-full p-3 duration-200 hover:bg-red-600 hover:rotate-90"
+              onClick={(e) => {
+                setConfirmation(!confirmation);
+                console.log("clicked");
+              }}
+            >
+              <Close />
+            </button>
+            <div className="w-2/5 bg-zinc-600 text-white z-10 rounded-xl absolute">
+              <div className="flex mx-auto items-center justify-center">
+                <h1 className="text-center text-xl font-medium">
+                  Do you want to continue with this Video ?
+                </h1>
+              </div>
+              <iframe
+                className="w-[90%] mx-auto h-72 rounded-2xl mt-4"
+                src={`https://www.youtube.com/embed/${videoId}`}
+                frameBorder="5"
+              ></iframe>
+              <div className="w-[90%] mx-auto flex items-center justify-around my-4">
+                <button
+                  className={`w-1/5 text-lg rounded-2xl text-white bg-zinc-900 p-2`}
+                >
+                  No
+                </button>
+                <button
+                  className="w-1/5 text-lg rounded-2xl text-black bg-blue-100 font-semibold hover:text-black p-2 hover:bg-blue-200 duration-300"
+                  onClick={() => setConfirmation(true)}
+                >
+                  Yes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full h-screen flex flex-col mx-auto gap-2">
+            <h1 className="text-center text-5xl font-bold">
+              Dive <span>Deeper</span> AI
+            </h1>
+            <div className="w-3/4 p-2 mx-auto h-[80vh] resize-none rounded-xl bg-stone-900 focus:outline-none">
+              {/* Render the conversation */}
+              {conversation.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`mb-4 flex ${
+                    msg.sender === "user"
+                      ? "justify-end"
+                      : "justify-start w-full"
+                  }`}
+                >
+                  <div
+                    className={`px-4 py-2 rounded-2xl max-w-[100%] font-light ${
+                      msg.sender === "user" ? "bg-zinc-950 text-white" : ""
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: msg.message }}
+                  />
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="w-3/4 mx-auto bg-stone-800 flex flex-row rounded-xl justify-between items-end">
+              <textarea
+                type="text"
+                className="bg-transparent p-2 h-14 w-[90%] resize-none focus:outline-none break-words whitespace-pre-line bg-stone-800 items-end"
+                placeholder="Ask Dive Deeper AI..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleSend();
+                  }
+                }}
+              ></textarea>
+              <button
+                className="bg-white m-1 w-12 h-12 rounded-full"
+                onClick={handleSend}
+              >
+                <span className="flex items-center justify-center p-2">
+                  {processing ? <Stop /> : <ArrowOut />}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 

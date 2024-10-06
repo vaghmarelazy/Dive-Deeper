@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import ArrowOut from "../assets/arrow_outward.svg";
 import Stop from "../assets/stop.svg";
 import Close from "../assets/close.svg";
+import AiIcon from "../assets/6aEVc501.svg";
 import axios from "axios";
+import Image from "next/image";
 
 function Chat({ videoId }) {
   const [inputMessage, setInputMessage] = useState("");
@@ -16,90 +18,18 @@ function Chat({ videoId }) {
   // Scroll to the bottom of the chat area when a new message is added
   const scrollToBottom = () => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+      chatEndRef.current.scrollIntoView({ behavior: "instant" });
     }
-  };
-
-  const handleInput = (event) => {
-    const target = event.target;
-    target.style.height = "50px"; // Reset height
-    target.style.height = `${Math.min(target.scrollHeight, 160)}px`; // Set new height (80px corresponds to max-h-20)
-  };
-
-  const handleSend = async () => {
-    if (!inputMessage.trim()) return; // Prevent sending empty messages
-
-    const newConversation = [
-      ...conversation,
-      { sender: "user", message: inputMessage },
-    ];
-    setConversation(newConversation); // Set conversation
-    setInputMessage(""); // Clear input after sending
-    setProcessing(true);
-
-    try {
-      // Call the backend API to get the AI response
-      const response = await fetch("/api/groqChat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message: inputMessage }),
-      });
-
-      const data = await response.json();
-      console.log(response);
-
-      if (response.ok) {
-        const formattedResponse = formatAIResponse(data.response);
-        setConversation((prev) => [
-          ...prev,
-          { sender: "ai", message: formattedResponse },
-        ]);
-      } else {
-        console.error("Error:", data.error);
-        setConversation((prev) => [
-          ...prev,
-          { sender: "ai", message: "Failed to get a response from the AI." },
-        ]);
-      }
-    } catch (error) {
-      console.error("Error fetching AI response:", error);
-      setConversation((prev) => [
-        ...prev,
-        { sender: "ai", message: "Error generating AI response." },
-      ]);
-    } finally {
-      setProcessing(false);
-      scrollToBottom(); // Scroll to the bottom after getting the response
-    }
-  };
-  const formatAIResponse = (text) => {
-    let counter = 1;
-
-    return text
-      .replace(/\n/g, "<br/>") // Replace newlines with <br> for line breaks
-      .replace(/\* (.*?)\n/g, () => `<br/><strong>${counter++}. </strong>`) // Replace '*' with increasing numbers
-      .replace(/-?\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Convert **text** to bold
-      .replace(/(.*?):/g, "<strong>$1:</strong>") // Make headings bold (text followed by a colon)
-      .replace(
-        /(Benefits|How it Works|Tips for Use|Types of)/gi,
-        "<h2 class='text-xl font-bold'>$1</h2>" // Larger, bold headers for main sections
-      )
-      .replace(
-        /(Overview|Conclusion)/gi,
-        "<h3 class='text-lg font-semibold'>$1</h3>" // Slightly smaller headers for sub-sections
-      );
   };
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log(process.env.NEXT_GROQ_API_KEY);
+      console.log(process.env.NEXT_PUBLIC_GROQ_API_KEY);
       try {
         const response = await axios.get(
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${api}`
         );
-        console.log(response.data.items);
+        console.log(response.data.items[0]);
 
         if (response.data.items && response.data.items.length > 0) {
           setVideoData(response.data.items[0]);
@@ -114,6 +44,158 @@ function Chat({ videoId }) {
     };
     fetchData();
   }, [videoId]);
+
+  async function preFetch() {
+    setConfirmation(true);
+    setProcessing(true);
+
+    try {
+      // Send the videoData to your AI model for summarization
+      const response = await fetch("/api/groqChat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ videoData }), // Send the entire video data
+      });
+
+      const data = await response.json();
+      console.log(data);
+
+      if (response.ok) {
+        // Use the AI's response to update the conversation or UI
+        setConversation((prev) => [
+          ...prev,
+          { sender: "ai", message: formatAIResponse(data.response) },
+        ]);
+      } else {
+        console.error("Error:", data.error);
+      }
+    } catch (error) {
+      console.error("Error sending video data:", error);
+    } finally {
+      setProcessing(false);
+      scrollToBottom();
+    }
+  }
+
+  const formatAIResponse = (text) => {
+    let counter = 1;
+    if (!text || text === "undefined") return ""; // Return empty if the response is invalid
+  
+    return text
+      .replace(/\n/g, "<br/>") // Replace newlines with <br> for line breaks
+      .replace(/\* (.*?)\n/g, () => `<br/><strong>${counter++}. </strong>`) // Replace '*' with increasing numbers
+      .replace(/-?\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Convert **text** to bold
+      .replace(/(.*?):/g, "<strong>$1:</strong>") // Make headings bold (text followed by a colon)
+      .replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>') // Convert block code ```code``` to <pre><code>
+      .replace(/`([^`]+)`/g, '<code>$1</code>'); // Convert inline `code` to <code>
+  };
+  
+
+  const simulateTyping = (fullMessage, delay = 25) => {
+    return new Promise((resolve) => {
+      if (!fullMessage || fullMessage === "undefined") {
+        resolve(); // Resolve immediately if the message is empty or undefined.
+        return;
+      }
+  
+      const words = fullMessage.trim().split(" "); // Trim the message to remove any extra spaces
+      let index = 0;
+  
+      const updateConversation = () => {
+        if (index < words.length) {
+          setConversation((prev) => {
+            const lastMessage = prev[prev.length - 1];
+            const newMessage = 
+              (lastMessage && lastMessage.sender === "ai" ? lastMessage.message : "") + 
+              (index === 0 ? "" : " ") + 
+              (words[index] || ""); // Ensure each word is not undefined
+              
+            if (lastMessage && lastMessage.sender === "ai") {
+              return [
+                ...prev.slice(0, prev.length - 1),
+                { sender: "ai", message: newMessage },
+              ];
+            } else {
+              return [...prev, { sender: "ai", message: newMessage }];
+            }
+          });
+          index++;
+          scrollToBottom(); // Scroll after each word
+          setTimeout(updateConversation, delay);
+        } else {
+          resolve(); // Finish typing
+        }
+      };
+  
+      updateConversation();
+    });
+  };
+  
+  
+
+  const handleSend = async () => {
+    if (!inputMessage.trim()) return;
+
+    const newConversation = [
+      ...conversation,
+      { sender: "user", message: inputMessage },
+    ];
+    setConversation(newConversation);
+    setInputMessage("");
+    setProcessing(true);
+
+    try {
+      const response = await fetch("/api/groqChat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: inputMessage }),
+      });
+
+      const data = await response.json();
+      console.log(data);
+      
+      if (response.ok && data.response) {
+        // Ensure data.response exists
+        const formattedResponse = data.response;
+
+        if (formattedResponse) {
+          // Add an empty AI message, then simulate typing the full response
+          setConversation((prev) => [...prev, { sender: "ai", message: "" }]);
+
+          // Simulate typing one word at a time
+          await simulateTyping(formattedResponse, 25);
+        }
+      } else {
+        console.error("Error:", data.error);
+        setConversation((prev) => [
+          ...prev,
+          {
+            sender: "ai",
+            message: "Failed to get a valid response from the AI.",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error fetching AI response:", error);
+      setConversation((prev) => [
+        ...prev,
+        { sender: "ai", message: "Error generating AI response." },
+      ]);
+    } finally {
+      setProcessing(false);
+      scrollToBottom();
+    }
+  };
+
+  const handleInput = (event) => {
+    const target = event.target;
+    target.style.height = "50px"; // Reset height
+    target.style.height = `${Math.min(target.scrollHeight, 160)}px`; // Set new height (80px corresponds to max-h-20)
+  };
 
   return (
     <>
@@ -146,15 +228,10 @@ function Chat({ videoId }) {
               ></iframe>
               <div className="w-[90%] mx-auto flex items-center justify-around my-4">
                 <button
-                  className={`w-1/5 text-lg rounded-2xl text-white bg-zinc-900 p-2`}
+                  className="w-1/5 text-lg rounded-2xl text-black bg-blue-100 font-medium  p-2"
+                  onClick={preFetch}
                 >
-                  No
-                </button>
-                <button
-                  className="w-1/5 text-lg rounded-2xl text-black bg-blue-100 font-semibold hover:text-black p-2 hover:bg-blue-200 duration-300"
-                  onClick={() => setConfirmation(true)}
-                >
-                  Yes
+                  Confirm
                 </button>
               </div>
             </div>
@@ -172,11 +249,15 @@ function Chat({ videoId }) {
                   className={`mb-4 flex ${
                     msg.sender === "user"
                       ? "justify-end"
-                      : "justify-start w-full"
+                      : "justify-start w-full "
                   }`}
                 >
+                  {/* Conditional rendering for AI icon */}
+                  <span className="w-fit mt-2">
+                    {msg.sender === "ai" && <AiIcon />}
+                  </span>
                   <div
-                    className={`px-4 py-2 rounded-2xl max-w-[100%] font-light ${
+                    className={`px-4 pl-2 py-2 rounded-2xl max-w-[100%] font-light ${
                       msg.sender === "user" ? "bg-zinc-950 text-white" : ""
                     }`}
                     dangerouslySetInnerHTML={{ __html: msg.message }}
@@ -199,8 +280,11 @@ function Chat({ videoId }) {
                 }}
               ></textarea>
               <button
-                className="bg-white m-1 w-12 h-12 rounded-full"
+                className={`m-1 w-12 h-12 rounded-full ${
+                  processing || inputMessage.trim() !== '' ? 'bg-white' : 'bg-zinc-400'
+                }`}
                 onClick={handleSend}
+                disabled={!inputMessage.trim() || processing}
               >
                 <span className="flex items-center justify-center p-2">
                   {processing ? <Stop /> : <ArrowOut />}

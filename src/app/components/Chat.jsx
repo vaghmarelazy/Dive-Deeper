@@ -4,7 +4,7 @@ import Stop from "../assets/stop.svg";
 import Close from "../assets/close.svg";
 import AiIcon from "../assets/6aEVc501.svg";
 import axios from "axios";
-import Image from "next/image";
+import { YoutubeTranscript } from "youtube-transcript";
 
 function Chat({ videoId }) {
   const [inputMessage, setInputMessage] = useState("");
@@ -12,24 +12,53 @@ function Chat({ videoId }) {
   const [videoData, setVideoData] = useState(null);
   const [conversation, setConversation] = useState([]); // To hold the full conversation
   const [confirmation, setConfirmation] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState(""); // New state for showing processing text
   const chatEndRef = useRef(null); // For auto-scrolling
-  const api = "AIzaSyBphJE_76cQvqaG0r75MhERv-9Ka33etwU";
+  // const api = "AIzaSyBphJE_76cQvqaG0r75MhERv-9Ka33etwU";
+  const api = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
 
   // Scroll to the bottom of the chat area when a new message is added
   const scrollToBottom = () => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "instant" });
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log(process.env.NEXT_PUBLIC_GROQ_API_KEY);
+      // console.log(process.env.NEXT_PUBLIC_GROQ_API_KEY);
       try {
         const response = await axios.get(
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${api}`
         );
         console.log(response.data.items[0]);
+
+        const transcriptResponse = await fetch(`/api/getTranscript`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ videoId }), // Send videoId in request body
+        });
+        
+        const sammaryData = await transcriptResponse.json();
+        console.log(sammaryData);
+        // const transcriptData = await transcriptResponse.json();
+        // console.log("TranscriptResponse: ", transcriptResponse);
+        // console.log("TranscriptData: ", transcriptData); // Access data properly
+        
+        // Ensure that `transcriptData` contains the actual transcript text or format it as needed.
+        // const modelsResponse = await fetch(`/api/summarize`, {
+        //   method: "POST",
+        //   headers: {
+        //     "Content-Type": "application/json",
+        //   },
+        //   body: JSON.stringify({ transcript: transcriptData }), // Send the correct part of transcriptData
+        // });
+        
+        // const modelsData = await modelsResponse.json();
+        // console.log("Summarized Data: ", modelsData); // Log the summarized data
+        
 
         if (response.data.items && response.data.items.length > 0) {
           setVideoData(response.data.items[0]);
@@ -43,11 +72,17 @@ function Chat({ videoId }) {
       }
     };
     fetchData();
-  }, [videoId]);
+  }, [videoId,api]);
 
   async function preFetch() {
     setConfirmation(true);
     setProcessing(true);
+
+    // Add "Processing..." message while AI is summarizing the video
+    setConversation((prev) => [
+      ...prev,
+      { sender: "ai", message: "AI is processing the video summary..." },
+    ]);
 
     try {
       // Send the videoData to your AI model for summarization
@@ -62,36 +97,50 @@ function Chat({ videoId }) {
       const data = await response.json();
       console.log(data);
 
-      if (response.ok) {
-        // Use the AI's response to update the conversation or UI
+      if (response.ok && data.response) {
+        const formattedResponse = data.response;
+
+        // Replace "Processing..." with an empty message to trigger typing simulation
+        setConversation((prev) => {
+          const updatedConversation = [...prev];
+          updatedConversation[updatedConversation.length - 1].message = ""; // Clear "Processing..."
+          return updatedConversation;
+        });
+
+        // Simulate typing for the actual AI response
+        await simulateTyping(formattedResponse, 25);
+      } else {
         setConversation((prev) => [
           ...prev,
-          { sender: "ai", message: formatAIResponse(data.response) },
+          {
+            sender: "ai",
+            message: "Failed to get a valid summary from the AI.",
+          },
         ]);
-      } else {
-        console.error("Error:", data.error);
       }
     } catch (error) {
-      console.error("Error sending video data:", error);
+      setConversation((prev) => [
+        ...prev,
+        { sender: "ai", message: "Error summarizing the video." },
+      ]);
     } finally {
       setProcessing(false);
-      scrollToBottom();
+      scrollToBottom(); // Ensure chat scrolls to the bottom
     }
   }
 
   const formatAIResponse = (text) => {
     let counter = 1;
     if (!text || text === "undefined") return ""; // Return empty if the response is invalid
-  
+
     return text
       .replace(/\n/g, "<br/>") // Replace newlines with <br> for line breaks
       .replace(/\* (.*?)\n/g, () => `<br/><strong>${counter++}. </strong>`) // Replace '*' with increasing numbers
       .replace(/-?\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Convert **text** to bold
       .replace(/(.*?):/g, "<strong>$1:</strong>") // Make headings bold (text followed by a colon)
-      .replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>') // Convert block code ```code``` to <pre><code>
-      .replace(/`([^`]+)`/g, '<code>$1</code>'); // Convert inline `code` to <code>
+      .replace(/```(.*?)```/gs, "<pre><code>$1</code></pre>") // Convert block code ```code``` to <pre><code>
+      .replace(/`([^`]+)`/g, "<code>$1</code>"); // Convert inline `code` to <code>
   };
-  
 
   const simulateTyping = (fullMessage, delay = 25) => {
     return new Promise((resolve) => {
@@ -99,19 +148,21 @@ function Chat({ videoId }) {
         resolve(); // Resolve immediately if the message is empty or undefined.
         return;
       }
-  
+
       const words = fullMessage.trim().split(" "); // Trim the message to remove any extra spaces
       let index = 0;
-  
+
       const updateConversation = () => {
         if (index < words.length) {
           setConversation((prev) => {
             const lastMessage = prev[prev.length - 1];
-            const newMessage = 
-              (lastMessage && lastMessage.sender === "ai" ? lastMessage.message : "") + 
-              (index === 0 ? "" : " ") + 
+            const newMessage =
+              (lastMessage && lastMessage.sender === "ai"
+                ? lastMessage.message
+                : "") +
+              (index === 0 ? "" : " ") +
               (words[index] || ""); // Ensure each word is not undefined
-              
+
             if (lastMessage && lastMessage.sender === "ai") {
               return [
                 ...prev.slice(0, prev.length - 1),
@@ -128,12 +179,10 @@ function Chat({ videoId }) {
           resolve(); // Finish typing
         }
       };
-  
+
       updateConversation();
     });
   };
-  
-  
 
   const handleSend = async () => {
     if (!inputMessage.trim()) return;
@@ -146,6 +195,12 @@ function Chat({ videoId }) {
     setInputMessage("");
     setProcessing(true);
 
+    // Add a "Processing..." message for the AI while waiting for a response
+    setConversation((prev) => [
+      ...prev,
+      { sender: "ai", message: "AI is processing..." },
+    ]);
+
     try {
       const response = await fetch("/api/groqChat", {
         method: "POST",
@@ -157,20 +212,19 @@ function Chat({ videoId }) {
 
       const data = await response.json();
       console.log(data);
-      
+
       if (response.ok && data.response) {
-        // Ensure data.response exists
         const formattedResponse = data.response;
 
-        if (formattedResponse) {
-          // Add an empty AI message, then simulate typing the full response
-          setConversation((prev) => [...prev, { sender: "ai", message: "" }]);
-
-          // Simulate typing one word at a time
-          await simulateTyping(formattedResponse, 25);
-        }
+        // Replace "Processing..." with an empty message to trigger typing simulation
+        setConversation((prev) => {
+          const updatedConversation = [...prev];
+          updatedConversation[updatedConversation.length - 1].message = ""; // Clear "Processing..."
+          return updatedConversation;
+        });
+        // Simulate typing for the actual AI response
+        await simulateTyping(formattedResponse, 25);
       } else {
-        console.error("Error:", data.error);
         setConversation((prev) => [
           ...prev,
           {
@@ -180,7 +234,6 @@ function Chat({ videoId }) {
         ]);
       }
     } catch (error) {
-      console.error("Error fetching AI response:", error);
       setConversation((prev) => [
         ...prev,
         { sender: "ai", message: "Error generating AI response." },
@@ -189,12 +242,6 @@ function Chat({ videoId }) {
       setProcessing(false);
       scrollToBottom();
     }
-  };
-
-  const handleInput = (event) => {
-    const target = event.target;
-    target.style.height = "50px"; // Reset height
-    target.style.height = `${Math.min(target.scrollHeight, 160)}px`; // Set new height (80px corresponds to max-h-20)
   };
 
   return (
@@ -242,7 +289,6 @@ function Chat({ videoId }) {
               Dive <span>Deeper</span> AI
             </h1>
             <div className="w-3/4 p-2 overflow-y-auto mx-auto h-[80vh] resize-none rounded-xl bg-stone-900 focus:outline-none">
-              {/* Render the conversation */}
               {conversation.map((msg, index) => (
                 <div
                   key={index}
@@ -252,20 +298,28 @@ function Chat({ videoId }) {
                       : "justify-start w-full "
                   }`}
                 >
-                  {/* Conditional rendering for AI icon */}
                   <span className="w-fit mt-2">
                     {msg.sender === "ai" && <AiIcon />}
                   </span>
                   <div
-                    className={`px-4 pl-2 py-2 rounded-2xl max-w-[100%] font-light ${
+                    className={`px-4 pl-2 py-2 rounded-2xl max-w-[100%] font-light first-letter:uppercase ${
                       msg.sender === "user" ? "bg-zinc-950 text-white" : ""
                     }`}
                     dangerouslySetInnerHTML={{ __html: msg.message }}
                   />
                 </div>
               ))}
+              {/* Render the "Processing..." message if it's set */}
+              {processingMessage && (
+                <div className="mb-4 flex justify-start w-full">
+                  <div className="px-4 pl-2 py-2 rounded-2xl bg-gray-500 text-white max-w-[100%] font-light">
+                    {processingMessage}
+                  </div>
+                </div>
+              )}
               <div ref={chatEndRef} />
             </div>
+
             <div className="w-3/4 mx-auto bg-stone-800 flex flex-row rounded-xl justify-between items-end">
               <textarea
                 type="text"
@@ -281,7 +335,9 @@ function Chat({ videoId }) {
               ></textarea>
               <button
                 className={`m-1 w-12 h-12 rounded-full ${
-                  processing || inputMessage.trim() !== '' ? 'bg-white' : 'bg-zinc-400'
+                  processing || inputMessage.trim() !== ""
+                    ? "bg-white"
+                    : "bg-zinc-400"
                 }`}
                 onClick={handleSend}
                 disabled={!inputMessage.trim() || processing}

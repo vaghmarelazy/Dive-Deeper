@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
 const groq = new Groq({
-  apiKey: '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'
+  apiKey: process.env.NEXT_PUBLIC_GROQ_API_KEY,
 });
 
 let conversationHistory = [
   { role: "system", content: "You are a research assistant. You help to find out more about the history of the person or entity." }
 ];
-
+  
 export async function POST(req) {
   try {
     const { message, videoData } = await req.json();
@@ -31,7 +31,7 @@ export async function POST(req) {
     // Generate AI response
     const chatCompletion = await groq.chat.completions.create({
       messages: conversationHistory,
-      model: "llama3-8b-8192",
+      model: "llama-3.2-90b-text-preview",
       temperature: 0.5,
       max_tokens: 1024,
       top_p: 1,

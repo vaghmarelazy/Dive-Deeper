@@ -4,7 +4,6 @@ import Stop from "../assets/stop.svg";
 import Close from "../assets/close.svg";
 import AiIcon from "../assets/6aEVc501.svg";
 import axios from "axios";
-import { YoutubeTranscript } from "youtube-transcript";
 
 function Chat({ videoId }) {
   const [inputMessage, setInputMessage] = useState("");
@@ -13,14 +12,16 @@ function Chat({ videoId }) {
   const [conversation, setConversation] = useState([]); // To hold the full conversation
   const [confirmation, setConfirmation] = useState(false);
   const [processingMessage, setProcessingMessage] = useState(""); // New state for showing processing text
+  const [summary, setSummary] = useState("")
   const chatEndRef = useRef(null); // For auto-scrolling
   // const api = "AIzaSyBphJE_76cQvqaG0r75MhERv-9Ka33etwU";
   const api = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   // Scroll to the bottom of the chat area when a new message is added
   const scrollToBottom = () => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+      chatEndRef.current.scrollIntoView({ behavior: "instant" });
     }
   };
 
@@ -31,35 +32,8 @@ function Chat({ videoId }) {
         const response = await axios.get(
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${api}`
         );
-        console.log(response.data.items[0]);
-
-        const transcriptResponse = await fetch(`/api/getTranscript`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ videoId }), // Send videoId in request body
-        });
+        // console.log(response.data.items[0]);
         
-        const sammaryData = await transcriptResponse.json();
-        console.log(sammaryData);
-        // const transcriptData = await transcriptResponse.json();
-        // console.log("TranscriptResponse: ", transcriptResponse);
-        // console.log("TranscriptData: ", transcriptData); // Access data properly
-        
-        // Ensure that `transcriptData` contains the actual transcript text or format it as needed.
-        // const modelsResponse = await fetch(`/api/summarize`, {
-        //   method: "POST",
-        //   headers: {
-        //     "Content-Type": "application/json",
-        //   },
-        //   body: JSON.stringify({ transcript: transcriptData }), // Send the correct part of transcriptData
-        // });
-        
-        // const modelsData = await modelsResponse.json();
-        // console.log("Summarized Data: ", modelsData); // Log the summarized data
-        
-
         if (response.data.items && response.data.items.length > 0) {
           setVideoData(response.data.items[0]);
         } else {
@@ -91,12 +65,12 @@ function Chat({ videoId }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ videoData }), // Send the entire video data
+        body: JSON.stringify({ videoData, videoId }), // Send the entire video data
       });
 
       const data = await response.json();
-      console.log(data);
-
+      // console.log(data);
+      
       if (response.ok && data.response) {
         const formattedResponse = data.response;
 
@@ -169,7 +143,7 @@ function Chat({ videoId }) {
                 { sender: "ai", message: newMessage },
               ];
             } else {
-              return [...prev, { sender: "ai", message: newMessage }];
+              return [...prev, { sender: "ai", message: formatAIResponse(newMessage) }];
             }
           });
           index++;
@@ -211,7 +185,7 @@ function Chat({ videoId }) {
       });
 
       const data = await response.json();
-      console.log(data);
+      // console.log(data);
 
       if (response.ok && data.response) {
         const formattedResponse = data.response;
@@ -257,7 +231,7 @@ function Chat({ videoId }) {
               className="absolute m-auto top-[10%] bg-zinc-300 rounded-full p-3 duration-200 hover:bg-red-600 hover:rotate-90"
               onClick={(e) => {
                 setConfirmation(!confirmation);
-                console.log("clicked");
+                // console.log("clicked");
               }}
             >
               <Close />
@@ -268,17 +242,31 @@ function Chat({ videoId }) {
                   Do you want to continue with this Video ?
                 </h1>
               </div>
+              {!iframeLoaded && (
+                <div className="wrapper w-[90%] h-72 mx-auto mt-4 flex items-center justify-center">
+                <div className="dot"></div>
+                <span className="text">
+                  Loading
+                </span>
+              </div>
+              )}
               <iframe
-                className="w-[90%] mx-auto h-72 rounded-2xl mt-4"
+                className={`w-[90%] mx-auto h-72 rounded-2xl mt-4 ${iframeLoaded ? 'block' : 'hidden'}`}
                 src={`https://www.youtube.com/embed/${videoId}`}
                 frameBorder="5"
+                onLoad={() => setIframeLoaded(true)}
               ></iframe>
               <div className="w-[90%] mx-auto flex items-center justify-around my-4">
                 <button
-                  className="w-1/5 text-lg rounded-2xl text-black bg-blue-100 font-medium  p-2"
+                  className={`w-1/5 text-lg rounded-2xl font-medium p-2 flex items-center justify-center ${
+                    iframeLoaded
+                      ? 'bg-blue-100 text-black hover:bg-blue-200'
+                      : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  }`}
                   onClick={preFetch}
+                  disabled={!iframeLoaded}
                 >
-                  Confirm
+                  {iframeLoaded ? 'Confirm' : <div className="loader w-2/3"></div>}
                 </button>
               </div>
             </div>

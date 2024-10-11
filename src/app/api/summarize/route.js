@@ -7,7 +7,7 @@ export async function POST(req) {
   try {
     // Parse the request body to get the transcript
     const { transcript } = await req.json();
-    console.log(transcript);
+    // console.log("Transcript",transcript);
 
     // Call Groq to generate a summary of the transcript
     const summarization = await groq.chat.completions.create({
@@ -25,6 +25,7 @@ export async function POST(req) {
       max_tokens: 1024, // Adjust the token limit as needed
       temperature: 0.5, // Adjust the creativity level as needed
     });
+    // console.log("Summary",summarization.choices[0].message.content)
 
     // Return the summarization as a JSON response
     return NextResponse.json({ summary: summarization.choices[0].message.content });

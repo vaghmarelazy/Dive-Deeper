@@ -1,15 +1,34 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import Chat from "./Chat";
+import Groq from "groq-sdk";
+
 
 function Hero() {
-  const [videoUrl, setVideoUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("https://youtu.be/tNrNLoCqzco?si=6JJk6ESquPCcg_c2");
   const [videoId, setVideoId] = useState("");
   const [error, setError] = useState("");
   const [textareaHeight, setTextareaHeight] = useState("min-h-10");
   const [loading, setLoading] = useState(false);
+  const groq = new Groq({ apiKey: process.env.NEXT_PUBLIC_GROQ_API_KEY, dangerouslyAllowBrowser: true });
 
   const chatRef = useRef(null);
+
+  // const getAvailableModels = async () => {
+  //   return await groq.models.list();
+  // };
+
+  // const models = [];
+  // getAvailableModels().then(model =>{
+  //   models.push(...model.data)
+  //   console.log("MODELS:", models); // Log models after they are fetched
+  // });
+
+  // // for(const model of models){
+  // //   console.log("MODELS",model)
+  // // }
+  // console.log(models);
+
 
   const extractVideoId = (url) => {
     try {

@@ -12,9 +12,7 @@ function Chat({ videoId }) {
   const [conversation, setConversation] = useState([]); // To hold the full conversation
   const [confirmation, setConfirmation] = useState(false);
   const [processingMessage, setProcessingMessage] = useState(""); // New state for showing processing text
-  const [summary, setSummary] = useState("")
   const chatEndRef = useRef(null); // For auto-scrolling
-  // const api = "AIzaSyBphJE_76cQvqaG0r75MhERv-9Ka33etwU";
   const api = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
@@ -33,7 +31,7 @@ function Chat({ videoId }) {
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${api}`
         );
         // console.log(response.data.items[0]);
-        
+
         if (response.data.items && response.data.items.length > 0) {
           setVideoData(response.data.items[0]);
         } else {
@@ -46,17 +44,13 @@ function Chat({ videoId }) {
       }
     };
     fetchData();
-  }, [videoId,api]);
+  }, [videoId, api]);
 
   async function preFetch() {
     setConfirmation(true);
     setProcessing(true);
 
-    // Add "Processing..." message while AI is summarizing the video
-    setConversation((prev) => [
-      ...prev,
-      { sender: "ai", message: "AI is processing the video summary..." },
-    ]);
+    setProcessingMessage("Fetching video data...");
 
     try {
       // Send the videoData to your AI model for summarization
@@ -70,19 +64,12 @@ function Chat({ videoId }) {
 
       const data = await response.json();
       // console.log(data);
-      
+
       if (response.ok && data.response) {
         const formattedResponse = data.response;
 
-        // Replace "Processing..." with an empty message to trigger typing simulation
-        setConversation((prev) => {
-          const updatedConversation = [...prev];
-          updatedConversation[updatedConversation.length - 1].message = ""; // Clear "Processing..."
-          return updatedConversation;
-        });
-
-        // Simulate typing for the actual AI response
-        await simulateTyping(formattedResponse, 25);
+        setProcessingMessage("");
+        await simulateTyping(formattedResponse, 10);
       } else {
         setConversation((prev) => [
           ...prev,
@@ -123,8 +110,19 @@ function Chat({ videoId }) {
         return;
       }
 
-      const words = fullMessage.trim().split(" "); // Trim the message to remove any extra spaces
+      const words = fullMessage.trim().split(" "); // Split the message into words
       let index = 0;
+
+      // Set up reference to the chat container
+      const chatContainerRef = chatEndRef.current?.parentNode;
+
+      // Check if the content has filled half of the screen height
+      const isHalfScreenFilled = () => {
+        if (!chatContainerRef) return false;
+        const { scrollHeight, clientHeight } = chatContainerRef;
+        const halfScreenHeight = window.innerHeight / 2; // Get half of the screen height
+        return scrollHeight - clientHeight > halfScreenHeight;
+      };
 
       const updateConversation = () => {
         if (index < words.length) {
@@ -135,20 +133,28 @@ function Chat({ videoId }) {
                 ? lastMessage.message
                 : "") +
               (index === 0 ? "" : " ") +
-              (words[index] || ""); // Ensure each word is not undefined
+              (words[index] || ""); // Add new word to the AI's message
 
             if (lastMessage && lastMessage.sender === "ai") {
               return [
-                ...prev.slice(0, prev.length - 1),
-                { sender: "ai", message: newMessage },
+                ...prev.slice(0, prev.length -1),
+                { sender: "ai", message: formatAIResponse(newMessage) },
               ];
             } else {
-              return [...prev, { sender: "ai", message: formatAIResponse(newMessage) }];
+              return [
+                ...prev,
+                { sender: "ai", message: formatAIResponse(newMessage) },
+              ];
             }
           });
           index++;
-          scrollToBottom(); // Scroll after each word
-          setTimeout(updateConversation, delay);
+
+          // Scroll until the content fills half of the screen height
+          if (!isHalfScreenFilled()) {
+            scrollToBottom(); // Scroll only if we haven't filled half the screen
+          }
+
+          setTimeout(updateConversation, delay); // Continue typing effect
         } else {
           resolve(); // Finish typing
         }
@@ -166,14 +172,8 @@ function Chat({ videoId }) {
       { sender: "user", message: inputMessage },
     ];
     setConversation(newConversation);
-    setInputMessage("");
     setProcessing(true);
-
-    // Add a "Processing..." message for the AI while waiting for a response
-    setConversation((prev) => [
-      ...prev,
-      { sender: "ai", message: "AI is processing..." },
-    ]);
+    setProcessingMessage("Thinking...");
 
     try {
       const response = await fetch("/api/groqChat", {
@@ -181,23 +181,19 @@ function Chat({ videoId }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: inputMessage }),
+        body: JSON.stringify({
+          message: inputMessage,
+          videoData, // Send video data with the user query
+        }),
       });
 
       const data = await response.json();
-      // console.log(data);
+      console.log(data.response);
 
       if (response.ok && data.response) {
         const formattedResponse = data.response;
-
-        // Replace "Processing..." with an empty message to trigger typing simulation
-        setConversation((prev) => {
-          const updatedConversation = [...prev];
-          updatedConversation[updatedConversation.length - 1].message = ""; // Clear "Processing..."
-          return updatedConversation;
-        });
-        // Simulate typing for the actual AI response
-        await simulateTyping(formattedResponse, 25);
+        setProcessingMessage("");
+        await simulateTyping(formattedResponse, 10);
       } else {
         setConversation((prev) => [
           ...prev,
@@ -215,6 +211,7 @@ function Chat({ videoId }) {
     } finally {
       setProcessing(false);
       scrollToBottom();
+      setProcessingMessage("");
     }
   };
 
@@ -244,14 +241,14 @@ function Chat({ videoId }) {
               </div>
               {!iframeLoaded && (
                 <div className="wrapper w-[90%] h-72 mx-auto mt-4 flex items-center justify-center">
-                <div className="dot"></div>
-                <span className="text">
-                  Loading
-                </span>
-              </div>
+                  <div className="dot"></div>
+                  <span className="text">Loading</span>
+                </div>
               )}
               <iframe
-                className={`w-[90%] mx-auto h-72 rounded-2xl mt-4 ${iframeLoaded ? 'block' : 'hidden'}`}
+                className={`w-[90%] mx-auto h-72 rounded-2xl mt-4 ${
+                  iframeLoaded ? "block" : "hidden"
+                }`}
                 src={`https://www.youtube.com/embed/${videoId}`}
                 frameBorder="5"
                 onLoad={() => setIframeLoaded(true)}
@@ -260,13 +257,17 @@ function Chat({ videoId }) {
                 <button
                   className={`w-1/5 text-lg rounded-2xl font-medium p-2 flex items-center justify-center ${
                     iframeLoaded
-                      ? 'bg-blue-100 text-black hover:bg-blue-200'
-                      : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                      ? "bg-blue-100 text-black hover:bg-blue-200"
+                      : "bg-gray-400 text-gray-600 cursor-not-allowed"
                   }`}
                   onClick={preFetch}
                   disabled={!iframeLoaded}
                 >
-                  {iframeLoaded ? 'Confirm' : <div className="loader w-2/3"></div>}
+                  {iframeLoaded ? (
+                    "Confirm"
+                  ) : (
+                    <div className="loader w-2/3"></div>
+                  )}
                 </button>
               </div>
             </div>
@@ -276,7 +277,7 @@ function Chat({ videoId }) {
             <h1 className="text-center text-5xl font-bold">
               Dive <span>Deeper</span> AI
             </h1>
-            <div className="w-3/4 p-2 overflow-y-auto mx-auto h-[80vh] resize-none rounded-xl bg-stone-900 focus:outline-none">
+            <div className="chat-container w-3/4 p-2 overflow-y-auto mx-auto h-[80vh] resize-none rounded-xl bg-stone-900 focus:outline-none">
               {conversation.map((msg, index) => (
                 <div
                   key={index}
@@ -297,7 +298,6 @@ function Chat({ videoId }) {
                   />
                 </div>
               ))}
-              {/* Render the "Processing..." message if it's set */}
               {processingMessage && (
                 <div className="mb-4 flex justify-start w-full">
                   <div className="px-4 pl-2 py-2 rounded-2xl bg-gray-500 text-white max-w-[100%] font-light">
@@ -311,13 +311,15 @@ function Chat({ videoId }) {
             <div className="w-3/4 mx-auto bg-stone-800 flex flex-row rounded-xl justify-between items-end">
               <textarea
                 type="text"
-                className="bg-transparent p-2 h-14 w-[90%] resize-none focus:outline-none break-words whitespace-pre-line bg-stone-800 items-end"
+                className="bg-transparent p-4 h-14 w-[90%] resize-none focus:outline-none break-words whitespace-pre-line bg-stone-800 items-end"
                 placeholder="Ask Dive Deeper AI..."
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
+                    e.preventDefault();
                     handleSend();
+                    setInputMessage("");
                   }
                 }}
               ></textarea>

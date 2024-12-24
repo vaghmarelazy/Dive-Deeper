@@ -13,6 +13,8 @@ export async function POST(req) {
       .map((item) => item.text) // Assuming each item has a `text` field
       .join(" "); // Join all text parts into a single string
 
+      // console.log(transcriptText);
+
     // Create an absolute URL for summarization (assumes localhost:3000 in development)
     const summarizationUrl =
     process.env.NODE_ENV === "production"
@@ -31,7 +33,6 @@ export async function POST(req) {
     });
 
     const summarizationData = await summarizationResponse.json();
-
     // Return the summarized data to the frontend
     return NextResponse.json(summarizationData);
 

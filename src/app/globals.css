@@ -128,3 +128,12 @@ pre {
   background: #212121dd;
   border-radius: 10px;
 }
+
+/* Optional: Smooth scrolling for the chat container */
+/* Chat container (adjust to fit half of the screen vertically) */
+.chat-container {
+  /* max-height: 50vh; 50% of the viewport height */
+  overflow-y: auto; /* Allow vertical scrolling if content exceeds container */
+  /* scroll-behavior: smooth; Smooth scrolling */
+}
+

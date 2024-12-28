@@ -5,7 +5,7 @@ import Groq from "groq-sdk";
 
 
 function Hero() {
-  const [videoUrl, setVideoUrl] = useState("https://youtu.be/tNrNLoCqzco?si=6JJk6ESquPCcg_c2");
+  const [videoUrl, setVideoUrl] = useState("https://youtu.be/yNWHT0JdukQ?si=K3EwxmprCCByDGYd");
   const [videoId, setVideoId] = useState("");
   const [error, setError] = useState("");
   const [textareaHeight, setTextareaHeight] = useState("min-h-10");

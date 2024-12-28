@@ -78,6 +78,7 @@ function Chat({ videoId }) {
             message: "Failed to get a valid summary from the AI.",
           },
         ]);
+        // setProcessingMessage("")
       }
     } catch (error) {
       setConversation((prev) => [
@@ -188,7 +189,7 @@ function Chat({ videoId }) {
       });
 
       const data = await response.json();
-      console.log(data.response);
+      // console.log(data.response);
 
       if (response.ok && data.response) {
         const formattedResponse = data.response;
@@ -202,6 +203,7 @@ function Chat({ videoId }) {
             message: "Failed to get a valid response from the AI.",
           },
         ]);
+        setProcessingMessage("");
       }
     } catch (error) {
       setConversation((prev) => [

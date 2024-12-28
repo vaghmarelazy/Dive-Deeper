@@ -38,7 +38,7 @@ export async function POST(req) {
     for (const model of models) {
       try {
         const summarization = await groq.chat.completions.create({
-          model: "llama-3.3-70b-versatile" || model.id,
+          model: model.id || "llama-3.3-70b-versatile",
           messages: [
             {
               role: "system",
@@ -65,9 +65,6 @@ export async function POST(req) {
         continue; // Try next model
       }
     }
-
-    // Return the summarization as a JSON response
-    // return NextResponse.json({ summary: summarization.choices[0].message.content });
   } catch (error) {
     console.error("Error generating summary:", error);
     return NextResponse.json(

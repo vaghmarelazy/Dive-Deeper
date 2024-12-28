@@ -13,15 +13,7 @@ export async function POST(req) {
       .map((item) => item.text) // Assuming each item has a `text` field
       .join(" "); // Join all text parts into a single string
 
-      // console.log(transcriptText);
-
-    // Create an absolute URL for summarization (assumes localhost:3000 in development)
-    const summarizationUrl =
-    process.env.NODE_ENV === "production"
-      ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/summarize`
-      : `http://localhost:3000/api/summarize`; // Replace with your production base URL
-
-  // console.log( "url",summarizationUrl)
+    const summarizationUrl =`${process.env.NEXT_PUBLIC_BASE_URL}/api/summarize`
 
     // Now that we have the clean transcript text, send it to the summarization model
     const summarizationResponse = await fetch(summarizationUrl, {

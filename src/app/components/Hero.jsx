@@ -1,35 +1,23 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useContext, createContext } from "react";
 import Chat from "./Chat";
-import Groq from "groq-sdk";
+// import { Model } from "@/lib/Model";
+import Model from "@/lib/Model";
 
-
+export const ModelContext = createContext(Model);
 function Hero() {
-  const [videoUrl, setVideoUrl] = useState("https://youtu.be/yNWHT0JdukQ?si=K3EwxmprCCByDGYd");
-  const [videoId, setVideoId] = useState("");
+  //Should to be removed when testing done
+  const [videoUrl, setVideoUrl] = useState(
+    "https://www.youtube.com/watch?v=yNWHT0JdukQ"
+  );
+  const [videoId, setVideoId] = useState("yNWHT0JdukQ");
   const [error, setError] = useState("");
   const [textareaHeight, setTextareaHeight] = useState("min-h-10");
   const [loading, setLoading] = useState(false);
-  const groq = new Groq({ apiKey: process.env.NEXT_PUBLIC_GROQ_API_KEY, dangerouslyAllowBrowser: true });
+  // const [Model, setModel] = useState(null);
+  // console.log("Model in Hero", ModelContext);
 
   const chatRef = useRef(null);
-
-  // const getAvailableModels = async () => {
-  //   return await groq.models.list();
-  // };
-
-  // const models = [];
-  // getAvailableModels().then(model =>{
-  //   models.push(...model.data)
-  //   console.log("MODELS:", models); // Log models after they are fetched
-  // });
-
-  // // for(const model of models){
-  // //   console.log("MODELS",model)
-  // // }
-  // console.log(models);
-
-
   const extractVideoId = (url) => {
     try {
       const urlObj = new URL(url);
@@ -67,18 +55,13 @@ function Hero() {
     setError(""); // Clear any previous errors
   };
 
-  // Handle Enter key press
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      initializeVideoPlayer();
-    }
-  };
-
-  // Scroll to chat when videoId changes
   useEffect(() => {
-    if (videoId && chatRef.current) { 
-      chatRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (videoId && chatRef.current) {
+      setTimeout(() => {
+        chatRef.current.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     }
+    
   }, [videoId]);
 
   return (
@@ -96,11 +79,11 @@ function Hero() {
           onChange={(e) => setVideoUrl(e.target.value)}
           placeholder="Paste youtube video link here"
           className="w-1/2 p-2 rounded-md bg-gray-800 text-white text-center mt-4"
-          onKeyPress={(e) => {
+          onKeyDown={(e) => {
             if (e.key === "Enter") {
               initializeVideoPlayer();
             }
-          }} 
+          }}
         />
         <button
           className="bg-red-600 text-white px-4 py-2 rounded-xl mt-4"
@@ -118,9 +101,14 @@ function Hero() {
           ></iframe>
         )}
       </logo>
-      {videoId && <div ref={chatRef}><Chat videoId={videoId}/></div>}
+      {videoId && (
+        <div ref={chatRef}>
+          <ModelContext.Provider value={{ model: Model }}>
+            <Chat videoId={videoId} />
+          </ModelContext.Provider>
+        </div>
+      )}
     </div>
   );
 }
-
 export default Hero;

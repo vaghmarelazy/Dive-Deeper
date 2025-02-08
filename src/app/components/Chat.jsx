@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import ArrowOut from "../assets/arrow_outward.svg";
 import Stop from "../assets/stop.svg";
 import Close from "../assets/close.svg";
 import AiIcon from "../assets/6aEVc501.svg";
 import axios from "axios";
+import { ModelContext } from "./Hero";
 
 function Chat({ videoId }) {
   const [inputMessage, setInputMessage] = useState("");
@@ -15,6 +16,8 @@ function Chat({ videoId }) {
   const chatEndRef = useRef(null); // For auto-scrolling
   const api = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const model  = useContext(ModelContext);
+  console.log("Model in Chat :", model.model);
 
   // Scroll to the bottom of the chat area when a new message is added
   const scrollToBottom = () => {
@@ -24,13 +27,13 @@ function Chat({ videoId }) {
   };
 
   useEffect(() => {
+    console.log("videoId",videoId)
     const fetchData = async () => {
-      // console.log(process.env.NEXT_PUBLIC_GROQ_API_KEY);
       try {
         const response = await axios.get(
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${api}`
         );
-        // console.log(response.data.items[0]);
+        // console.log("Response of fetching data",response)
 
         if (response.data.items && response.data.items.length > 0) {
           setVideoData(response.data.items[0]);
@@ -49,28 +52,33 @@ function Chat({ videoId }) {
   async function preFetch() {
     setConfirmation(true);
     setProcessing(true);
-
     setProcessingMessage("Fetching video data...");
-
     try {
-      // Send the videoData to your AI model for summarization
-      const response = await fetch("/api/groqChat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ videoData, videoId }), // Send the entire video data
+      const response = await axios.post(`${window.origin}/api/prefetch`, {
+        videoData,
+        videoId,
+        model
       });
-
-      const data = await response.json();
-      // console.log(data);
-
+      console.log("Response from the prefetch", response.data.transcriptText)
+      const data = response.data.transcriptText;
       if (response.ok && data.response) {
-        const formattedResponse = data.response;
+        console.log("Got response", data.response);
+        const formattedResponse = [...data.response];
+        console.log("Formatted response", formattedResponse);
 
         setProcessingMessage("");
-        await simulateTyping(formattedResponse, 10);
+        setConversation((prev) => [
+          ...prev,
+          // { sender: "ai", message: formatAIResponse(formattedResponse) },
+          {
+            sender: "ai",
+            message: formattedResponse
+              .map((item) => formatAIResponse(item.text))
+              .join(", "),
+          },
+        ]);
       } else {
+        setProcessingMessage("");
         setConversation((prev) => [
           ...prev,
           {
@@ -78,91 +86,30 @@ function Chat({ videoId }) {
             message: "Failed to get a valid summary from the AI.",
           },
         ]);
-        // setProcessingMessage("")
       }
     } catch (error) {
+      console.log(error)
       setConversation((prev) => [
         ...prev,
         { sender: "ai", message: "Error summarizing the video." },
       ]);
     } finally {
       setProcessing(false);
-      scrollToBottom(); // Ensure chat scrolls to the bottom
+      scrollToBottom();
     }
   }
 
   const formatAIResponse = (text) => {
     let counter = 1;
-    if (!text || text === "undefined") return ""; // Return empty if the response is invalid
+    if (!text || text === "undefined") return "";
 
     return text
-      .replace(/\n/g, "<br/>") // Replace newlines with <br> for line breaks
-      .replace(/\* (.*?)\n/g, () => `<br/><strong>${counter++}. </strong>`) // Replace '*' with increasing numbers
-      .replace(/-?\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Convert **text** to bold
-      .replace(/(.*?):/g, "<strong>$1:</strong>") // Make headings bold (text followed by a colon)
-      .replace(/```(.*?)```/gs, "<pre><code>$1</code></pre>") // Convert block code ```code``` to <pre><code>
-      .replace(/`([^`]+)`/g, "<code>$1</code>"); // Convert inline `code` to <code>
-  };
-
-  const simulateTyping = (fullMessage, delay = 25) => {
-    return new Promise((resolve) => {
-      if (!fullMessage || fullMessage === "undefined") {
-        resolve(); // Resolve immediately if the message is empty or undefined.
-        return;
-      }
-
-      const words = fullMessage.trim().split(" "); // Split the message into words
-      let index = 0;
-
-      // Set up reference to the chat container
-      const chatContainerRef = chatEndRef.current?.parentNode;
-
-      // Check if the content has filled half of the screen height
-      const isHalfScreenFilled = () => {
-        if (!chatContainerRef) return false;
-        const { scrollHeight, clientHeight } = chatContainerRef;
-        const halfScreenHeight = window.innerHeight / 2; // Get half of the screen height
-        return scrollHeight - clientHeight > halfScreenHeight;
-      };
-
-      const updateConversation = () => {
-        if (index < words.length) {
-          setConversation((prev) => {
-            const lastMessage = prev[prev.length - 1];
-            const newMessage =
-              (lastMessage && lastMessage.sender === "ai"
-                ? lastMessage.message
-                : "") +
-              (index === 0 ? "" : " ") +
-              (words[index] || ""); // Add new word to the AI's message
-
-            if (lastMessage && lastMessage.sender === "ai") {
-              return [
-                ...prev.slice(0, prev.length -1),
-                { sender: "ai", message: formatAIResponse(newMessage) },
-              ];
-            } else {
-              return [
-                ...prev,
-                { sender: "ai", message: formatAIResponse(newMessage) },
-              ];
-            }
-          });
-          index++;
-
-          // Scroll until the content fills half of the screen height
-          if (!isHalfScreenFilled()) {
-            scrollToBottom(); // Scroll only if we haven't filled half the screen
-          }
-
-          setTimeout(updateConversation, delay); // Continue typing effect
-        } else {
-          resolve(); // Finish typing
-        }
-      };
-
-      updateConversation();
-    });
+      .replace(/\n/g, "<br/>")
+      .replace(/\* (.*?)\n/g, () => `<br/><strong>${counter++}. </strong>`)
+      .replace(/-?\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(.*?):/g, "<strong>$1:</strong>")
+      .replace(/```(.*?)```/gs, "<pre><code>$1</code></pre>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
   };
 
   const handleSend = async () => {
@@ -184,17 +131,19 @@ function Chat({ videoId }) {
         },
         body: JSON.stringify({
           message: inputMessage,
-          videoData, // Send video data with the user query
+          videoData,
         }),
       });
 
       const data = await response.json();
-      // console.log(data.response);
 
       if (response.ok && data.response) {
         const formattedResponse = data.response;
         setProcessingMessage("");
-        await simulateTyping(formattedResponse, 10);
+        setConversation((prev) => [
+          ...prev,
+          { sender: "ai", message: formatAIResponse(formattedResponse) },
+        ]);
       } else {
         setConversation((prev) => [
           ...prev,
@@ -216,7 +165,7 @@ function Chat({ videoId }) {
       setProcessingMessage("");
     }
   };
-
+  
   return (
     <>
       {videoId && (
@@ -230,7 +179,6 @@ function Chat({ videoId }) {
               className="absolute m-auto top-[10%] bg-zinc-300 rounded-full p-3 duration-200 hover:bg-red-600 hover:rotate-90"
               onClick={(e) => {
                 setConfirmation(!confirmation);
-                // console.log("clicked");
               }}
             >
               <Close />

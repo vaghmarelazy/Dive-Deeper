@@ -1,30 +1,31 @@
 import { YoutubeTranscript } from 'youtube-transcript';
 import { NextResponse } from 'next/server';
+import axios from 'axios';
 
 export async function POST(req) {
+  const { videoId, model } = await req.json();
+  // console.log("Model",model)
+  // Fetch the transcript data using the YouTube Transcript API
   try {
-    const { videoId } = await req.json();
-    
-    // Fetch the transcript data using the YouTube Transcript API
     const transcriptData = await YoutubeTranscript.fetchTranscript(videoId);
-
-    // Extract just the text from the transcript
+    console.log("transcript page transcriptData - ", transcriptData)
     const transcriptText = transcriptData
       .map((item) => item.text) // Assuming each item has a `text` field
       .join(" "); // Join all text parts into a single string
-
-    const summarizationUrl =`${process.env.NEXT_PUBLIC_BASE_URL}/api/summarize`
-
-    // Now that we have the clean transcript text, send it to the summarization model
-    const summarizationResponse = await fetch(summarizationUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ transcript: transcriptText }), // Send clean text
-    });
-
-    const summarizationData = await summarizationResponse.json();
+  } catch (error) {
+    console.error("Error fetching transcript", error)
+    return NextResponse.json(
+      { error: 'Failed to fetch transcript.' },
+      { status: 500 }
+    );
+  }
+  try {
+    const response = await axios.post(`${window.origin}/api/summarize`, {
+      transcript: transcriptText,
+      model: model
+    })
+    const summarizationData = await response.json();
+    console.log("The data from summarization :", summarizationData)
     // Return the summarized data to the frontend
     return NextResponse.json(summarizationData);
 
